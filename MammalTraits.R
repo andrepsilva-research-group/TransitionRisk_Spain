@@ -45,6 +45,15 @@ easypackages::packages(
 # devtools::install_github("RangeShifter/RangeShiftR-package", ref="main", force=TRUE)
 # credentials::set_github_pat("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") # last token used for github connection)
 
+# Select mammal species
+sps_names <- c("Sus scrofa", "Vulpes vulpes", "Alces alces", "Canis latrans", "Lynx rufus", "Martes americana", "Taxidea taxus", "Ursus americanus", 
+"Leontopithecus caissara", "Leopardus pardalis", "Nasua nasua", "Aepyceros melampus", "Colobus angolensis", "Daubentonia madagascariensis",
+"Diceros bicornis", "Erythrocebus patas", "Gorilla beringei", "Gorilla gorilla", "Orycteropus afer", "Pan paniscus", "Pan troglodytes",
+"Papio anubis", "Papio ursinus", "Cervus nippon", "Cuon alpinus", "Felis chaus", "Macaca fuscata", "Pongo abelii", "Pongo pygmaeus",
+"Lynx lynx", "Ursus arctos", "Canis lupus", "Rangifer tarandus", "Puma concolor", "Bison bison", "Ursus arctos", "Panthera onca",
+"Crocuta crocuta", "Mandrillus sphinx", "Panthera pardus", "Syncerus caffer", "Acinonyx jubatus", "Panthera leo", "Connochaetes taurinus",
+"Loxodonta africana", "Acinonyx jubatus", "Panthera tigris")
+
 if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   mammalTraits_data <- read_csv(list.files(pattern = "mammalTraits_.*\\.csv$"))
 } else {
