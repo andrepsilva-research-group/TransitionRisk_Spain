@@ -15,6 +15,7 @@ bankSpain_sps <- c("Crocidura canariensis", "Eliomys quercinus", "Galemys pyrena
                    "Pipistrellus maderensis", "Rhinolophus mehelyi", "Oryctolagus cuniculus",
                    "Plecotus teneriffae", "Miniopterus schreibersii")
 
+setwd("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE")
 
 if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   mammalTraits_data <- read_csv(list.files(pattern = "mammalTraits_.*\\.csv$"))
@@ -24,10 +25,10 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   cat(bold(red("No file detected:"),green("creating mammal trait database...")))
   
   ## import IUCN terrestrial mammals .shp
-  IUCN_mammals <- sf::st_read("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE/SRIT_ANDRE/external_data/MAMMALS_TERRESTRIAL_ONLY/MAMMALS_TERRESTRIAL_ONLY.shp")
+  IUCN_mammals <- sf::st_read("./SRIT_ANDRE/external_data/MAMMALS_TERRESTRIAL_ONLY/MAMMALS_TERRESTRIAL_ONLY.shp")
   
   # import galemys pyrenaicus .shp
-  galemys <- sf::st_read("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE/galemis_pirenaicos/data_0.shp")
+  galemys <- sf::st_read("./galemis_pirenaicos/data_0.shp")
   # galemys is a freshwater mammals and thus is not included in the terrestrial mammals shapefile
   
   ## processing galemys .shp to match IUCN_mammals ##
@@ -59,7 +60,7 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   invisible(gc())
   
   # import the biome data
-  biomes <- read_sf("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE/SRIT_ANDRE/external_data/Ecoregions2017/Ecoregions2017.shp") %>% #"ecoregions/Ecoregions2017.shp"
+  biomes <- read_sf("./SRIT_ANDRE/external_data/Ecoregions2017/Ecoregions2017.shp") %>% #"ecoregions/Ecoregions2017.shp"
     st_make_valid() %>%
     naniar::replace_with_na(list(BIOME_NAME = c("N/A"))) %>%
     dplyr::select('BIOME_NAME') %>%
@@ -68,7 +69,7 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   invisible(gc())
   
   # import the continent data (https://figshare.com/articles/dataset/Continent_Polygons/12555170)
-  continent <- read_sf("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE/SRIT_ANDRE/external_data/continent/Continents.shp")[,2] #"continent/Continents.shp"
+  continent <- read_sf("./SRIT_ANDRE/external_data/continent/Continents.shp")[,2] #"continent/Continents.shp"
   
   # intersect ecoregions and continents shapefiles
   biomes <- st_intersection(st_make_valid(biomes),st_make_valid(continent))
@@ -126,7 +127,7 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   ## IMPORT TRAIT DATASETS ##
   
   # import PHYLACINE1.2 data from: https://megapast2future.github.io/PHYLACINE_1.2/ 
-  PHYLACINE1.2_traits <- read_csv("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE/SRIT_ANDRE/external_data/PHYLACINE_1.2.1/Data/Traits/Trait_data.csv") 
+  PHYLACINE1.2_traits <- read_csv("./SRIT_ANDRE/external_data/PHYLACINE_1.2.1/Data/Traits/Trait_data.csv") 
   PHYLACINE1.2_traits$Binomial.1.2 <- str_replace_all(PHYLACINE1.2_traits$Binomial.1.2, "_", " ") #remove "_" between the generic name and the specific epithet and replace with a "space"
   PHYLACINE1.2_traits$Diet.Meat <- PHYLACINE1.2_traits$Diet.Vertebrate+PHYLACINE1.2_traits$Diet.Invertebrate
   
@@ -135,14 +136,14 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   # naniar::replace_with_na_all(condition = ~.x == -999)
   
   # import SANTINI et al 2022: https://onlinelibrary.wiley.com/doi/10.1111/geb.13476 
-  santini2022 <- read_excel("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE/SRIT_ANDRE/external_data/geb13476-sup-0002-tables1.xls")  #reports error of RMSE_bvs instead of numeric (it's ok)
+  santini2022 <- read_excel("./SRIT_ANDRE/external_data/geb13476-sup-0002-tables1.xls")  #reports error of RMSE_bvs instead of numeric (it's ok)
   
   # # import ANIMAL DIVERSITY WEB data (deprecated)
   # ADW_202404081457 <- read_excel("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE/SRIT_ANDRE/external_data/ADW_202404081457.xls")
   # unique(ADW_202404081457$`Mating System`)
   
   # import COMBINE database
-  combine <- read_csv("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE/SRIT_ANDRE/external_data/ecy3344-sup-0001-datas1/COMBINE_archives/trait_data_imputed.csv")
+  combine <- read_csv("./SRIT_ANDRE/external_data/ecy3344-sup-0001-datas1/COMBINE_archives/trait_data_imputed.csv")
   
   
   ## SELECT, MERGE & HARMONIZE TRAITS ##
