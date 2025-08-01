@@ -15,10 +15,10 @@ bankSpain_sps <- c("Crocidura canariensis", "Eliomys quercinus", "Galemys pyrena
                    "Pipistrellus maderensis", "Rhinolophus mehelyi", "Oryctolagus cuniculus",
                    "Plecotus teneriffae", "Miniopterus schreibersii")
 
-setwd("C:/Users/maria/OneDrive - Universidade de Lisboa/ANDRE")
+#setwd("C:/Users/User/OneDrive - Universidade de Lisboa (1)/ANDRE")
 
-if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
-  mammalTraits_data <- read_csv(list.files(pattern = "mammalTraits_.*\\.csv$"))
+if (length(list.files(pattern = "mammalTraits_bankOfSpain.*\\.csv$")) != 0) {
+  mammalTraits_data <- read_csv(list.files(pattern = "mammalTraits_bankOfSpain.*\\.csv$"))
 } else {
   
   ### Printing message
@@ -56,6 +56,7 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
     distinct(sci_name, .keep_all = TRUE) %>%
     dplyr::filter(sci_name %in% bankSpain_sps) %>%
     dplyr::select(sci_name, family, order_) %>%
+    mutate(Genus = word(sci_name, 1)) %>%
     st_drop_geometry()
   invisible(gc())
   
@@ -92,7 +93,8 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   invisible(gc())
   
   # import home range data
-  HomeRangeData <- GetHomeRangeData()
+  HomeRangeData <- read_csv("HomeRangeData_2025_04_11_1/HomeRangeData_2025_04_11.csv")
+    #GetHomeRangeData()
   # HomeRangeData_pop <- HomeRangeData %>% 
   #   #dplyr::filter(HR_Level %in% "Population (mean)") %>% 
   #   dplyr::filter(Species %in% bankSpain_sps)
@@ -112,6 +114,18 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   # processing data (selecting home ranges with isopleth that contain 90% or more)
   HomeRangeData <- HomeRangeData[HomeRangeData$Isopleth_Size >= 90,]
   
+  # HomeRange sizes per species
+  HomeRange_species <- HomeRangeData %>%
+    mutate(Genus = word(Species, 1)) %>%
+    dplyr::filter(Species %in% bankSpain_sps) %>% 
+    group_by(Genus, Species) %>%
+    summarise(
+      Max_Home_Range_km2 = max(Home_Range_km2, na.rm = TRUE),
+      Min_Home_Range_km2 = min(Home_Range_km2, na.rm = TRUE),
+      Mean_Home_Range_km2 = mean(Home_Range_km2, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
   # average homeRanges per genus (because only 6 of our target species have a record for its homeRange size)
   HomeRange_genus <- HomeRangeData %>%
     mutate(Genus = word(Species, 1)) %>% 
@@ -119,7 +133,7 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
     summarise(
       Max_Home_Range_km2 = max(Home_Range_km2, na.rm = TRUE),
       Min_Home_Range_km2 = min(Home_Range_km2, na.rm = TRUE),
-      Mean_HomeRange_km2 = mean(Home_Range_km2, na.rm = TRUE),
+      Mean_Home_Range_km2 = mean(Home_Range_km2, na.rm = TRUE),
       .groups = "drop"
     )
   invisible(gc())
@@ -149,40 +163,88 @@ if (length(list.files(pattern = "mammalTraits_.*\\.csv$")) != 0) {
   ## SELECT, MERGE & HARMONIZE TRAITS ##
   
   combined_traits_data <- filtered_traits %>%
-    mutate(Genus = word(sci_name, 1)) %>% # add genus column
+    #mutate(Genus = word(sci_name, 1)) %>% # add genus column
     left_join(combine, by = c('sci_name' = 'iucn2020_binomial')) %>%
     left_join(PHYLACINE1.2_traits, by = c("sci_name" = "Binomial.1.2")) %>%
     #left_join(pantheria, by = c("sci_name" = "scientificNameStd")) %>% 
     #left_join(ADW_202404081457, by = c('sci_name'= 'Species')) %>% 
-    left_join(santini2022, by = c('sci_name'= 'Species')) %>% 
+    left_join(santini2022, by = c('sci_name'= 'Species')) %>%
+    left_join(HomeRange_species, by = c("sci_name" = "Species", "Genus" = "Genus"))%>%
     left_join(HomeRange_genus, by = "Genus") %>%
-    left_join(sps_biome, by = c('sci_name' = 'sci_name'))  %>%
+    left_join(sps_biome, by = c('sci_name' = 'sci_name')) %>%
     mutate(
-      Combined_HomeRange_km2 = coalesce(Mean_HomeRange_km2, home_range_km2)) %>%
+      # Coalesce from species-level, then genus-level, then home_range_km2 fallback
+      Mean_Home_Range_filled = coalesce(Mean_Home_Range_km2.x, Mean_Home_Range_km2.y, home_range_km2),
+      Max_Home_Range_filled = coalesce(Max_Home_Range_km2.x, Max_Home_Range_km2.y, home_range_km2),
+      Min_Home_Range_filled = coalesce(Min_Home_Range_km2.x, Min_Home_Range_km2.y, home_range_km2),
+      # Create final combined home range estimate
+      Combined_HomeRange_km2 = Mean_Home_Range_filled
+    ) %>%
     dplyr::select(
-      # taxonomic info from IUCN & combine
       sci_name, family.x, order_,
-      # Diet info from phylacine 1.2
       Diet.Meat, Diet.Plant, trophic_level,
-      # Body size from PHYLACINE 1.2
       Mass.g, max_longevity_d, weaning_mass_g,
-      # age & reproduction info from combine
       age_first_reproduction_d, litter_size_n, litters_per_year_n,
-      # mating info from ADW
-      #'Mating System',
-      # abundance info from santini et al 
       PredMd, up75,
-      # habitat related info from ecoregions.shp, continents.shp, homeRange pckg and combine
-      BIOME_NAME, CONTINENT, Mean_HomeRange_km2, Max_Home_Range_km2, Min_Home_Range_km2, home_range_km2, Combined_HomeRange_km2
+      BIOME_NAME, CONTINENT,
+      Mean_Home_Range_filled, Max_Home_Range_filled, Min_Home_Range_filled,
+      home_range_km2, Combined_HomeRange_km2
     ) %>%
     distinct()
   # %>% drop_na()
   
   # csv file with trait data
-  write.csv(combined_traits_data, paste0("mammalTraitsbankOfSpain_",Sys.Date(),".csv"), row.names = FALSE)
+  write.csv(combined_traits_data, paste0("./data/mammalTraits_bankOfSpain_",Sys.Date(),".csv"), row.names = FALSE)
   
   # summary info
   complete_data_sps <- data.frame(unique(combined_traits_data$sci_name))
   names(complete_data_sps) <-"Species"
   print(paste("NºSpecies:",nrow(complete_data_sps)))
 }
+
+
+# to Keep track of which type of value (if sps, genus or from the combine) we can run the next piece of code
+# join all datasets
+joined_data <- filtered_traits %>%
+  mutate(Genus = word(sci_name, 1)) %>%
+  left_join(combine, by = c('sci_name' = 'iucn2020_binomial')) %>%
+  left_join(PHYLACINE1.2_traits, by = c("sci_name" = "Binomial.1.2")) %>%
+  left_join(santini2022, by = c('sci_name'= 'Species')) %>%
+  left_join(HomeRange_species, by = c("sci_name" = "Species", "Genus" = "Genus")) %>%
+  left_join(HomeRange_genus, by = "Genus") %>%
+  left_join(sps_biome, by = c('sci_name' = 'sci_name'))
+
+home_range_sources <- joined_data %>%
+  # create new df with only the origin of each value
+  mutate(
+    sci_name,
+    Mean_Home_Range_source = case_when(
+      # if it comes from the species level data from HomeRange package
+      !is.na(Mean_Home_Range_km2.x) ~ "species",
+      # if it comes from the genus level data from HomeRange package
+      is.na(Mean_Home_Range_km2.x) & !is.na(Mean_Home_Range_km2.y) ~ "genus",
+      # if it comes from the combine database
+      is.na(Mean_Home_Range_km2.x) & is.na(Mean_Home_Range_km2.y) & !is.na(home_range_km2) ~ "fallback - COMBINE",
+      TRUE ~ NA_character_
+    ),
+    # same explanation as before
+    Max_Home_Range_source = case_when(
+      !is.na(Max_Home_Range_km2.x) ~ "species",
+      is.na(Max_Home_Range_km2.x) & !is.na(Max_Home_Range_km2.y) ~ "genus",
+      is.na(Max_Home_Range_km2.x) & is.na(Max_Home_Range_km2.y) & !is.na(home_range_km2) ~ "fallback - COMBINE",
+      TRUE ~ NA_character_
+    ),
+    Min_Home_Range_source = case_when(
+      !is.na(Min_Home_Range_km2.x) ~ "species",
+      is.na(Min_Home_Range_km2.x) & !is.na(Min_Home_Range_km2.y) ~ "genus",
+      is.na(Min_Home_Range_km2.x) & is.na(Min_Home_Range_km2.y) & !is.na(home_range_km2) ~ "fallback - COMBINE",
+      TRUE ~ NA_character_
+    ),
+    # keep only new columns
+    .keep = "none"
+  ) %>% 
+  distinct()
+ 
+# write homerange info to metadata file
+write.csv(home_range_sources, "./data/metadata_homeRangeSources.csv", row.names = FALSE)
+
