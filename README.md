@@ -1,4 +1,4 @@
-# 🏦 bankOfSpain: Nature-related Risk Assessment Pipeline
+# bankOfSpain
 
 A research pipeline to explore companies Nature-related Risks. A case with the Bank of Spain.
 
