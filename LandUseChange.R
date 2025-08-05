@@ -9,6 +9,20 @@
 source("src/server/libraries.R") # libraries
 source("src/server/customFunctions.R") # functions
 
+# Download high-resolution (300m), global projections of land-use change under SSP-RCP scenarios derived from SEALS (Spatial Economic Allocation Landscape Simulator)
+# by Johnson, J. A., & Thakrar, S., (2024) (Data availability: https://doi.org/10.5281/zenodo.14506512)
+
+# Define the file paths to the downloaded and processed data
+basePathLandUse <- "data/stitched_lulc_esa_scenarios"
+outputPathLandscapes <- "output/Landscapes"
+if (!dir.exists(outputPathLandscapes)) {
+  dir.create(outputPathLandscapes, recursive = TRUE)
+}
+outputPathLandUse <- "output/LandUseChange"
+if (!dir.exists(outputPathLandUse)) {
+  dir.create(outputPathLandUse, recursive = TRUE)
+}
+
 # Input variables -------------------------------------------
 # Define input variables
 scenarios <- c("ssp126", "ssp585") # define socio-economic pathways
@@ -32,17 +46,6 @@ target_resolution <- 0.04166 # approx. 5km resolution
 extent <- "Spain and Portugal"
 extent_name <- "Spain and Portugal"
 extent_sf <- rnaturalearth::ne_countries(scale = "medium", country = c("Spain", "Portugal"), returnclass = "sf")
-
-# Define the file paths
-basePathLandUse <- "data/stitched_lulc_esa_scenarios"
-outputPathLandscapes <- "output/Landscapes"
-if (!dir.exists(outputPathLandscapes)) {
-  dir.create(outputPathLandscapes, recursive = TRUE)
-}
-outputPathLandUse <- "output/LandUseChange"
-if (!dir.exists(outputPathLandUse)) {
-  dir.create(outputPathLandUse, recursive = TRUE)
-}
 
 # Simplify and define ESA LULC types (39) to the 7 (SEALS) LULC types
 # ESA LULC simplification scheme based on  Johnson, J. A., & Thakrar, S., (2024)
