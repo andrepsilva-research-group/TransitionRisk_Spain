@@ -9,6 +9,20 @@
 source("src/libraries.R") # libraries
 source("src/customFunctions.R") # functions
 
+# Climatologies at high resolution for the earth’s land surface areas (CHELSEA) data provided by Karger et al. (2017 & 2021)
+# (Data availability: https://chelsa-climate.org/downloads/)
+# Define the file paths to the downloaded and processed data
+basePathClim <- "data/CHELSA_gfdl-esm4_V.2.1"
+outputPathLandscapes <- "output/Landscapes"
+if (!dir.exists(outputPathLandscapes)) {
+  dir.create(outputPathLandscapes, recursive = TRUE)
+}
+
+# Define output path
+outputPathClimate <- "output/ClimateChange"
+if (!dir.exists(outputPathClimate)) {
+  dir.create(outputPathClimate, recursive = TRUE)
+  
 # Input variables -------------------------------------------
 # Define input variables
 scenarios <- c("ssp126", "ssp585") # define socio-economic pathways
