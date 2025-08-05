@@ -8,7 +8,7 @@
 source("src/libraries.R") # libraries
 # When using the pipeline for the first time run taxaOcccurence.R and adapt species and user-login for GBIF Database:
 #source("NatPoKe1/src/TaxaOccurence.R") # downloads taxa occurences from GBIF Database
-source("src/customFunctions2.R") # functions
+source("src/customFunctions.R") # functions
 source("src/SDMnew.R") # function to format data and SDM
 
 # Define scenarios and environmental variables -----------------------------------------------------------------
