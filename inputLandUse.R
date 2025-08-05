@@ -4,7 +4,9 @@
 ## Date: August 5th 2025 ##
 
 # Input variables -------------------------------------------
-# Define the file paths
+# Download high-resolution (300m), global projections of land-use change under SSP-RCP scenarios derived from SEALS (Spatial Economic Allocation Landscape Simulator)
+# by Johnson, J. A., & Thakrar, S., (2024) (Data availability: https://doi.org/10.5281/zenodo.14506512)
+# Define the file paths to downloaded land-use data
 basePathLandUse <- "data/stitched_lulc_esa_scenarios"
 
 # Simplify and define ESA LULC types (39) to the 7 (SEALS) LULC types
