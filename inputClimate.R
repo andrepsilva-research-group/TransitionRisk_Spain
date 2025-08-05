@@ -8,7 +8,7 @@
 # Climatologies at high resolution for the earth’s land surface areas (CHELSEA) data provided by Karger et al. (2017 & 2021)
 # (Data availability: https://chelsa-climate.org/downloads/)
 # Define the file paths to the downloaded and processed data
-basePathClim <- "data/CHELSA_gfdl-esm4_V.2.1"
+basePathClim <- "data/CHELSA_Data"
 
 yearsOrigin <- c("2011-2040", "2041-2070", "2071-2100") # original in time periods"2011-2040", "2041-2070", "2071-2100"
 baseline_yearOrigin <- "1981-2010"
