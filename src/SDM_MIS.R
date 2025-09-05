@@ -9,35 +9,22 @@
 # we don't get errors running it:
 # (1) do not work inside a One Drive folder;
 # (2) avoid saving the outputs using long path (MAXNET does not deal well with them)
-# (3) some minor chnages were done to André and Jorinde's function, namely adding
+# (3) some minor chnages were done to André's function, namely adding
 # the path to the maxent folder as a function argument (might not be necessary in
-# the future if we stick with MAXNET)
+# the future if we stick with MAXNET but I am still leaving it here)
+# (4) function stops if one species has an error
 
 
 # Settings & libraries ---------------------------------------------------------
 source("src/libraries.R") # libraries
 source("src/customFunctions2.R") # functions
 
-# occurence data
-speciesData <- read.csv("data/GBIF_birds_30+occurrences_Spain_and_Portugal.csv")
-speciesData$species <- gsub(" ", ".", speciesData$species)
-invisible(gc())
-
-# Select target species (from .csv file for now)
-targetSpecies <- c("Streptopelia turtur", "Otis tarda", "Chlamydotis undulata",
-                   "Neophron percnopterus", "Gyps rueppellii", "Aquila adalberti",
-                   "Lanius meridionalis", "Chersophilus duponti", "Fringilla polatzeki",
-                   "Pyrrhula murina")
-targetSpecies <- gsub(" ", ".", targetSpecies)
-# check target species are included in occ file
-#targetSpecies %in% speciesData$species
-invisible(gc())
 
 # load training ladnscape
 myExpl_full <- rast("data/Landscapes/trainingLandscapes_2015_5km.tif")
 
 # Define extent to crop predicitionLandscapes (Spain and Portugal)
-extent <- "Spain and Portugal"
+extent <- "IberianPeninsula"
 extent_sf <- rnaturalearth::ne_countries(scale = "medium", country = c("Spain", "Portugal"), returnclass = "sf")
 extent_crs <- sf::st_transform(extent_sf, crs = crs(myExpl_full)) # Ensure CRS consistency
 extent_sp <- terra::vect(extent_crs) # Convert the sf to a spatial object
@@ -48,24 +35,25 @@ myExplCurrent <- list(crop(rast("data/Landscapes/trainingLandscapes_2015_5km.tif
 invisible(gc())
 
 # crop prediction landscapes by the extent
-ssp126_2030_ptsp <- crop(rast("data/Landscapes/predictionLandscapes_ssp126_2030_5km.tif"), extent_sp)
-ssp126_2050_ptsp <- crop(rast("data/Landscapes/predictionLandscapes_ssp126_2050_5km.tif"), extent_sp)
-ssp126_2100_ptsp <- crop(rast("data/Landscapes/predictionLandscapes_ssp126_2100_5km.tif"), extent_sp)
-ssp585_2030_ptsp <- crop(rast("data/Landscapes/predictionLandscapes_ssp585_2030_5km.tif"), extent_sp)
-ssp585_2050_ptsp <- crop(rast("data/Landscapes/predictionLandscapes_ssp585_2050_5km.tif"), extent_sp)
-ssp585_2100_ptsp <- crop(rast("data/Landscapes/predictionLandscapes_ssp585_2100_5km.tif"), extent_sp)
+ssp126_2030 <- crop(rast("data/Landscapes/predictionLandscapes_ssp126_2030_5km.tif"), extent_sp)
+ssp126_2050 <- crop(rast("data/Landscapes/predictionLandscapes_ssp126_2050_5km.tif"), extent_sp)
+#ssp126_2100 <- crop(rast("data/Landscapes/predictionLandscapes_ssp126_2100_5km.tif"), extent_sp)
+ssp585_2030 <- crop(rast("data/Landscapes/predictionLandscapes_ssp585_2030_5km.tif"), extent_sp)
+ssp585_2050 <- crop(rast("data/Landscapes/predictionLandscapes_ssp585_2050_5km.tif"), extent_sp)
+#ssp585_2100 <- crop(rast("data/Landscapes/predictionLandscapes_ssp585_2100_5km.tif"), extent_sp)
 invisible(gc())
 
 # Now create the named list
 myExplFuture <- list(
-  ssp126_2030_ptsp = ssp126_2030_ptsp,
-  ssp126_2050_ptsp = ssp126_2050_ptsp,
-  ssp126_2100_ptsp = ssp126_2100_ptsp,
-  ssp585_2030_ptsp = ssp585_2030_ptsp,
-  ssp585_2050_ptsp = ssp585_2050_ptsp,
-  ssp585_2100_ptsp = ssp585_2100_ptsp
+  ssp126_2030 = ssp126_2030,
+  ssp126_2050 = ssp126_2050,
+  #ssp126_2100 = ssp126_2100_ptsp,
+  ssp585_2030 = ssp585_2030,
+  ssp585_2050 = ssp585_2050
+  #,
+  #ssp585_2100 = ssp585_2100_ptsp
 )
-
+gc()
 
 ## BUILDING A FUCNTION FOR SDMs ##
 
@@ -73,14 +61,14 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
                                     myExpl_full, myExplCurrent, myExplFuture,
                                     extent, output_folder, maxent_source, ncoresToUse) {
   
-  # If changes are required use these args for testing inside the function
+  # # If changes are required use these args for testing inside the function
   # targetSpecies <- targetSpecies[1]
   # speciesData <- speciesData
   # myExpl_full <- myExpl_full
   # myExplCurrent <- myExplCurrent
   # myExplFuture <- myExplFuture
   # extent <- "Global Terrestrial"
-  # output_folder <- "./output/23Aug_Binary"
+  # output_folder <- "./output/28Aug2025"
   # maxent_source <- "C:/Users/maria/Desktop/maxent/maxent/maxent.jar"
   # #"C:/Users/User/OneDrive - Universidade de Lisboa/Ambiente de Trabalho/maxent/maxent/maxent.jar"
   # ncoresToUse <- 6
@@ -120,8 +108,18 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
   # Remove NAs and filter out records older than 2015
   # this might reduce the number of presence data to <30 occurences
   DataSingleSpecies <- DataSingleSpecies %>%
-    drop_na(decimalLongitude,decimalLatitude, year)%>%
+    drop_na(decimalLongitude,decimalLatitude, year)
+  
+  DataSingleSpecies <- DataSingleSpecies %>%
     filter(year >= 2015)
+  
+  # skip species if there are not at least 100 occ
+  if (nrow(DataSingleSpecies) < 100) {
+    msg <- paste("Skipping", targetSpecies, 
+                 "- only", nrow(DataSingleSpecies), "occurrences >= 2015.")
+    message(msg)
+    next
+  }
   
   # Assign cell IDs to each occurrence based on myExpl raster
   cellValues <- terra::extract(
@@ -142,18 +140,18 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
   
   set.seed(123)
   # get number of rows
-  nrows <- nrow(DataSingleSpecies_unique)
+  #nrows <- nrow(DataSingleSpecies_unique)
   # safe sample: if <30 rows, take all
   DataSingleSpecies_unique <- DataSingleSpecies_unique %>%
-    slice_sample(n = min(30, nrows))
+    slice_sample(n = 100) %>% 
+    as.data.frame()
   
   # Format species occurence data (presence only data)
-  DataSingleSpecies_unique <- as.data.frame(DataSingleSpecies_unique)
   myResp <- as.numeric(DataSingleSpecies_unique$species == targetSpecies)
   myRespXY <- DataSingleSpecies_unique[, c("decimalLongitude", "decimalLatitude")]
   
   n.pres <- sum(myResp == 1)
-  nb.PA <- c(n.pres, n.pres, n.pres, 100, 100, 100) # number of pseudo-absences per set
+  nb.PA <- c(n.pres, n.pres, n.pres, 1000, 1000, 1000) # number of pseudo-absences per set
   
   # Format input data (with initial pseudo-absences set) 
   myBiomodData.PA <- BIOMOD_FormatingData(
@@ -177,6 +175,8 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
   presence_df$type <- "Presence Points"
   presence_df$species <- as.character(targetSpecies)
   presence_df <- na.omit(presence_df)
+  
+  # save presence points as .csv 
   write.csv(
     presence_df,
     file = file.path(paste0("PresencePoints_", targetSpecies, "_", extent, ".csv")),
@@ -220,7 +220,7 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
     CV.perc = 0.7, # data split, percentage that will be kept for calibration
     OPT.strategy = 'bigboss',
     prevalence = 0.5, # same weight for presences and abs since we have a very inbalanced dataset
-    metric.eval = c("TSS", "ROC"), # ADD BOYCE
+    metric.eval = c("TSS", "ROC"), # ADD BOYCE?
     var.import = 3, # PROBABLY CHANGE TO 1 TO SAVE TIME
     nb.cpu = ncoresToUse, #Parallelization
     do.progress = TRUE)
@@ -237,8 +237,8 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
   #variableImportance <- rbind(variableImportance, var_importance)  # Combine importance across species
   
   # Save evaluation scores and variable importance to files
-  write.csv(eval_scores, file = file.path(paste0("EvalScores_", targetSpecies, extent, ".csv")), row.names = FALSE)
-  write.csv(var_importance, file = file.path(paste0("VarImportance_", targetSpecies, extent, ".csv")), row.names = FALSE)
+  write.csv(eval_scores, file = file.path(paste0("EvalScores_", targetSpecies, "_", extent, ".csv")), row.names = FALSE)
+  write.csv(var_importance, file = file.path(paste0("VarImportance_", targetSpecies, "_", extent, "_", ".csv")), row.names = FALSE)
   
   # Save evaluation score boxplots and variables importance
   #png(
@@ -310,11 +310,13 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
   
   var_importanceEM <- get_variables_importance(myBiomodEM)
   var_importanceEM$species <- targetSpecies  # Add species column
-  #variableImportanceEM <- rbind(variableImportanceEM, var_importanceEM)  # Combine importance across species
   
   # Save evaluation scores and variable importance to files
-  write.csv(eval_scoresEM, file = file.path(paste0("EvalScoresEM_", targetSpecies, extent, ".csv")), row.names = FALSE)
-  write.csv(var_importanceEM, file = file.path(paste0("VarImportanceEM_", targetSpecies, extent, ".csv")), row.names = FALSE)
+  write.csv(eval_scoresEM, file = file.path(paste0("EvalScoresEM_", targetSpecies, "_", extent, ".csv")), row.names = FALSE)
+  write.csv(var_importanceEM, file = file.path(paste0("VarImportanceEM_", targetSpecies, "_", extent, ".csv")), row.names = FALSE)
+
+  #variableImportanceEM <- rbind(variableImportanceEM, var_importanceEM)  # Combine importance across species
+  
   
   # Save evaluation score boxplots and variables importance
   #png(
@@ -322,7 +324,7 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
   #  width = 2000,
   #  height = 1500,
   #  res = 300)
-  #bm_PlotEvalBoxplot(bm.out = myBiomodEM, group.by = c('full.name', 'full.name'))
+  #bm_PlotEvalBoxplot(bm.out = myBiomodEM, group.by = c('metric', 'metric'))
   #dev.off()
   
   #png(
@@ -338,7 +340,6 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
   ##########
   # STEP 6 # Project ensemble models for current conditions
   ##########
-
   
   # Project ensemble models (from single projections) on current conditions
   myBiomodEMProj <- lapply(myBiomodProj, function(Proj) { # as list to apply to multiple proj 
@@ -393,33 +394,59 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
   # Get evaluation results to extract threshold
   evals <- get_evaluations(myBiomodEM)
   th_TSS <- evals$cutoff[evals$metric.eval == "TSS"]
+  
+  ## CURRENT CONDITIONS RASTER ##
+  
+  EMcurrent <- get_predictions(myBiomodEMProj[[1]], as.data.frame = FALSE)
+  
+  # save normal suitability (continuous) raster
+  EMcurrent_filename <- file.path(
+    #output_folder,
+    paste0("proj_Current_EM_", gsub(" ", ".", targetSpecies), "_continuous.tif"))
+  terra::writeRaster(EMcurrent, EMcurrent_filename, overwrite = TRUE)
+  
+  # Save binary raster
+  bin_rasters <- bm_BinaryTransformation(data = EMcurrent, threshold = th_TSS, do.filtering = FALSE)
+  names(bin_rasters) <- paste0("ssp126_2030", names(bin_rasters), "_TSSbin")
+  
+  # save a converted (binary) raster
+  bin_filename <- file.path(
+    #output_folder,
+    paste0("proj_Current_EM_",gsub(" ", ".", targetSpecies), "_binary.tif"))
+  terra::writeRaster(bin_rasters, bin_filename, overwrite = TRUE)
+  
+  rm(EMcurrent, EMcurrent_filename, bin_rasters, bin_filename)  
+  
+  invisible(gc())
 
+  ## FUTURE CONDITIONS ##
+  
   # go through each scenario to save it
   lapply(names(myBiomodEF), function(sc){
     
-    ef <- myBiomodEF[[sc]]
+    EFproj <- myBiomodEF[[sc]]
     
     # --- Continuous raster ---
-    cont_rasters <- get_predictions(ef, as.data.frame = FALSE)
+    cont_rasters <- get_predictions(EFproj, as.data.frame = FALSE)
     names(cont_rasters) <- paste0(sc, "_", names(cont_rasters))
     
     # save normal suitability (continuous) raster
     cont_filename <- file.path(
       #output_folder,
-      paste0("EnsembleForecast_", gsub(" ", "_", targetSpecies), "_", sc, "_continuous.tif"))
+      paste0("proj_", sc, "_", gsub(" ", ".", targetSpecies), "_continuous.tif"))
     terra::writeRaster(cont_rasters, cont_filename, overwrite = TRUE)
     
     # --- Binary raster (using TSS threshold & biomod2 function) ---
     bin_rasters <- bm_BinaryTransformation(data = cont_rasters, threshold = th_TSS, do.filtering = FALSE)
-    names(bin_rasters) <- paste0(sc, "_", names(cont_rasters), "_TSSbin")
+    names(bin_rasters) <- paste0("ssp126_2030_", names(bin_rasters), "_TSSbin")
     
     # save a converted (binary) raster
     bin_filename <- file.path(
       #output_folder,
-      paste0("EnsembleForecast_", gsub(" ", "_", targetSpecies), "_", sc, "_binary.tif"))
+      paste0("proj_", sc, "_", gsub(" ", ".", targetSpecies), "_binary.tif"))
     terra::writeRaster(bin_rasters, bin_filename, overwrite = TRUE)
-    
-    rm(ef,cont_rasters, bin_rasters,cont_filename, bin_filename)
+    #plot(bin_rasters)
+    rm(EFproj, cont_rasters, bin_rasters, cont_filename, bin_filename)
     invisible(gc())
   })
   
@@ -472,6 +499,24 @@ SDMensembleMultiSpecies <- function(targetSpecies, speciesData,
    
 }
 
+################################# BIRD SPECIES #################################
+
+
+# occurence data for BIRDS
+speciesData <- read.csv("data/GBIF_birds_30+occurrences_Spain_and_Portugal.csv")
+speciesData$species <- gsub(" ", ".", speciesData$species)
+invisible(gc())
+
+# Select target BIRD species (from .csv file for now)
+targetSpecies <- c("Streptopelia turtur", "Otis tarda", "Chlamydotis undulata",
+                   "Neophron percnopterus", "Gyps rueppellii", "Aquila adalberti",
+                   "Lanius meridionalis", "Chersophilus duponti", "Fringilla polatzeki",
+                   "Pyrrhula murina")
+targetSpecies <- gsub(" ", ".", targetSpecies)
+# check target species are included in occ file
+#targetSpecies %in% speciesData$species
+invisible(gc())
+
 
 SDM_BOS_birds <- lapply(targetSpecies, function(sp) {
       SDMensembleMultiSpecies(
@@ -480,9 +525,64 @@ SDM_BOS_birds <- lapply(targetSpecies, function(sp) {
         myExpl_full = myExpl_full,
         myExplCurrent = myExplCurrent,
         myExplFuture = myExplFuture,
-        extent = "Global Terrestrial",
-        output_folder = "C:/Users/maria/Desktop/24Aug2025",
+        extent = "IberianPeninsula",
+        output_folder = "C:/Users/maria/Desktop/birdOutputs",
         maxent_source = "C:/Users/maria/Desktop/maxent/maxent/maxent.jar", 
         ncoresToUse = 6
       )
 })
+
+
+################################ MAMMAL SPECIES ################################
+
+gc()
+
+# occurence data for MAMMALS
+speciesData <- read.csv("data/GBIF_mammals_30+occurrences_Spain_and_Portugal.csv")
+speciesData$species <- gsub(" ", ".", speciesData$species)
+invisible(gc())
+
+# Select target MAMMALS species (from .csv file for now)
+targetSpecies <- c("Crocidura canariensis", "Eliomys quercinus", "Galemys pyrenaicus",
+                   "Lepus castroviejoi", "Lynx pardinus", "Myotis capaccinii",
+                   "Nyctalus lasiopterus", "Nyctalus azoreum", "Pipistrellus maderensis",
+                   "Rhinolophus mehelyi", "Oryctolagus cuniculus", "Plecotus teneriffae", "Miniopterus schreibersii")
+targetSpecies <- gsub(" ", ".", targetSpecies)
+# check target species are included in occ file
+targetSpecies %in% speciesData$species
+invisible(gc())
+
+
+SDM_BOS_mammals <- lapply(targetSpecies, function(sp) {
+  SDMensembleMultiSpecies(
+    targetSpecies = sp,
+    speciesData = speciesData,
+    myExpl_full = myExpl_full,
+    myExplCurrent = myExplCurrent,
+    myExplFuture = myExplFuture,
+    extent = "IberianPeninsula",
+    output_folder = "C:/Users/maria/Desktop/mammalOutputs",
+    maxent_source = "C:/Users/maria/Desktop/maxent/maxent/maxent.jar", 
+    ncoresToUse = 6
+  )
+})
+
+SDM_BOS_mammals <- lapply(targetSpecies, function(sp) {
+  tryCatch({
+    SDMensembleMultiSpecies(
+      targetSpecies = sp,
+      speciesData = speciesData,
+      myExpl_full = myExpl_full,
+      myExplCurrent = myExplCurrent,
+      myExplFuture = myExplFuture,
+      extent = "IberianPeninsula",
+      output_folder = "C:/Users/maria/Desktop/mammalOutputs",
+      maxent_source = "C:/Users/maria/Desktop/maxent/maxent/maxent.jar", 
+      ncoresToUse = 6
+    )
+  }, error = function(e) {
+    message(paste("⚠️ Skipping", sp, "due to error:", e$message))
+    return(NULL)   # or NA if you prefer
+  })
+})
+
