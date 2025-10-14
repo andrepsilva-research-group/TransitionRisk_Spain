@@ -1,31 +1,32 @@
 ## Name: CustomFunctions2.R ##
-## Authors: Jorinde-M. Rieger ##
-## Description: Loads all developed customised functions for LandUseChange.R, ClimateChange.R, inputClimate.R, inputLandUse.R, SDMRun.R ##
+## Authors: Jorinde-M. Rieger & Inês Silva ##
+## Description: Loads all user-developed functions for LandUseChange.R, ClimateChange.R, inputClimate.R, inputLandUse.R, SDMRun.R ##
 ## Date: August 5th 2025 ##
 
-#####################################
-# General Functions
-#####################################
+#####################
+# General Functions #
+#####################
+
 # Functions to load and modify rasters-------------------------------------------
 # Function to crop and mask rasters
 crop_mask_raster <- function(raster, biome_sp) {
   terra::mask(terra::crop(raster, biome_sp), biome_sp)
 }
 
-# Function to extract the legend from a ggplot object
+# Function to extract the legend from a ggplot object --------------------------
 extract_legend <- function(plot) {
   gtable <- ggplotGrob(plot)
   legend <- gtable$grobs[which(sapply(gtable$grobs, function(x) x$name) == "guide-box")][[1]]
   return(legend)
 }
 
-# Function to load and select the biome shapefile
+# Function to load and select the biome shapefile ------------------------------
 load_biome <- function(biome_name) {
   biome_sf <- sf::st_read("data/Ecoregions2017/Ecoregions2017.shp")
   biome_sf[biome_sf$BIOME_NAME == biome_name, ]
 }
 
-# Function to load and select continents
+# Function to load and select continents ---------------------------------------
 load_select_continents <- function(continent_names) {
   continents <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
   merged_continents <- list() # Initialize an empty list to store merged continents
@@ -77,7 +78,7 @@ load_select_continents <- function(continent_names) {
   return(all_continents)
 }
 
-# Function to intersect biome with continents
+# Function to intersect biome with continents ----------------------------------
 #intersect_biome_with_continents <- function(biome_sf, continent_geoms) {
 intersect_extent_continents <- function(extent_sf, continent_geoms) {
   # Validate and fix geometries
@@ -96,14 +97,15 @@ intersect_extent_continents <- function(extent_sf, continent_geoms) {
   return(biome_continents)
 }
 
-# Function to crop the biome boundaries to the continents
+# Function to crop the biome boundaries to the continents ----------------------
 crop_biome_to_continent <- function(biome, continent_geom) {
   st_intersection(biome, continent_geom)
 }
 
-#####################################
+##############################
 # Climate realated Functions #
-#####################################
+##############################
+
 # Functions to load rasters -------------------------------------------
 load_baseline_clim <- function(variable, baseline_year){
   file_path <- file.path(basePathClim, paste0("CHELSA_", variable, "_", baseline_year, "_V.2.1.tif"))
@@ -117,7 +119,7 @@ load_average_scenario_clim <- function(outputPath, scenario, year, variable){
   file_path <- file.path(outputPath, paste0("AverageCHELSA",variable, "_", scenario, "_", yearOrigin, ".tif"))
   terra::rast(file_path)}
 
-# Function to calculate the average for a given scenario, year, and variable
+# Function to calculate the average for a given scenario, year, and variable ----
 # to save computation time this could be saved as netCDF (terra::writeCDF)
 average_climate_models <- function(outputPath, scenario, yearOrigin, variable) {
   # Initialize a list to store rasters for all models
@@ -154,7 +156,7 @@ average_climate_models <- function(outputPath, scenario, yearOrigin, variable) {
   return(averaged_raster)
 }
 
-# Function to extract mean values from a raster stack
+# Function to extract mean values from a raster stack --------------------------
 extract_mean_values <- function(raster_stack, years, value_type) {
   mean_values <- sapply(1:nlyr(raster_stack), function(i) {
     mean(values(raster_stack[[i]]), na.rm = TRUE)
@@ -167,7 +169,7 @@ extract_mean_values <- function(raster_stack, years, value_type) {
   )
 }
 
-# Functions to vizualize results -------------------------------------------
+# Functions to vizualize results -----------------------------------------------
 # Function to create plots
 plot_timeChanges <- function(mean_values_df, value_type, y_label) {
   ggplot(mean_values_df, aes(x = Year, y = Mean, color = Scenario, group = Scenario)) +
@@ -190,7 +192,7 @@ plot_timeChanges <- function(mean_values_df, value_type, y_label) {
     )
 }
 
-
+# UNDESCRIBED FUNCTION !!!!!!!!!!!! --------------------------------------------
 plot_ClimatespatialChanges <- function(raster, extent_geom, color_ramp, fill_label, min_value, max_value) {
   # Convert raster to data frame
   raster_df <- as.data.frame(raster, xy = TRUE)
@@ -268,10 +270,11 @@ plot_ClimatespatialChanges <- function(raster, extent_geom, color_ramp, fill_lab
   return(plot)
 }
 
-#####################################
+#############################
 # Land-Use Change Functions #
-#####################################
-# Functions to load rasters-------------------------------------------
+#############################
+
+# Functions to load rasters ----------------------------------------------------
 # Baseline raster
 load_baseline_landUse <- function(baseline_year){
   rast("data/stitched_lulc_esa_scenarios/lulc_esa_2015.tif")
@@ -299,7 +302,7 @@ load_mapped_landUse <- function(outputPath, year, extent) {
   }
 }
 
-# Functions to modify rasters-------------------------------------------
+# Functions to modify rasters --------------------------------------------------
 # Function to stack rasters
 stack_rasters <- function(year, scenarios, extent, outputPathLandscapes) {
   scenarios_list <- list()
@@ -324,7 +327,7 @@ stack_rasters <- function(year, scenarios, extent, outputPathLandscapes) {
   return(scenarios_stack)
 }
 
-# Functions to analyze rasters-------------------------------------------
+# Functions to analyze rasters -------------------------------------------------
 # Function to calculate the percentages for each land-use type
 calculate_landUse_percentages <- function(raster_stack, landUse_types, landUse_names, time) {
   # Create binary maps for each land-use type
@@ -420,7 +423,7 @@ calculateRasterClass <- function(OriginalRaster, extent, target_resolution) {
   return(aggregated_rasters_stack)
 }
 
-# Function to replace numbers of LULC Types with names (for baseline raster)
+# Function to replace numbers of LULC Types with names (for baseline raster) ---
 replace_numbers_with_names <- function(raster_list, types, names) {
   # Replace the names of the raster layers with the corresponding land-use names
   names(raster_list) <- names[match(names(raster_list), types)]
@@ -477,7 +480,7 @@ calculate_percentage_changes <- function(base_year_raster, target_year_rasters_l
   return(percentage_change_rasters_list)
 }
 
-# Functions to vizualize results -------------------------------------------
+# Functions to vizualize results -----------------------------------------------
 # Function to create individual plots for each scenario, class, and year
 plot_landUse_spatialChanges <- function(raster, biome_geom, color_ramp, fill_label, min_value, max_value, coord_limits = NULL) {
   # Convert raster to data frame
@@ -560,11 +563,11 @@ plot_landUse_spatialChanges <- function(raster, biome_geom, color_ramp, fill_lab
 }
 
 
-#####################################
-#  Format species input data Functions for SDMRun.R #
-#####################################
+#######################################
+# Format species input data Functions # specific for SDMRun.R 
+#######################################
 
-# Function to remove species duplicates by cell ID
+# Function to remove species duplicates by cell ID -----------------------------
 removeSpeciesDuplicatesbyCellID <- function (dataframe) {
   SpeciesDataOcc <- dataframe %>%
     drop_na(cell) %>%
@@ -578,3 +581,115 @@ removeSpeciesDuplicatesbyCellID <- function (dataframe) {
   SpeciesDataOcc[numeric_cols] <- lapply(SpeciesDataOcc[numeric_cols], function(x) round(x, 5))
   return(SpeciesDataOcc)
 }
+
+####################
+# Taxa Occurrences # 
+####################
+
+# This function downloads and clean species occurrence records from GBIF
+# !! NAVIGATION WARNING !! in order to use it, one has to register in the GBIF
+# database website. OR use the api_keys.yml file in the config folder
+
+get_taxa_occurrences <- function(
+    iucn_shapefile, # (IUCN) spatial file
+    taxa_filter = NULL, # use in case we want to subset specific species
+    gbif_user = "", # GBIF username
+    gbif_pwd = "", # GBIF password
+    gbif_email = "") # GBIF account email
+{
+  
+  ##########
+  # STEP 1 # Read IUCN ranges and species list
+  ##########
+  
+  # progess message
+  message("Selecting species names from IUCN ranges file")
+  
+  IUCN_ranges <- sf::st_read(iucn_shapefile)
+  invisible(gc())
+  
+  # keep unique species names
+  taxa_spp <- unique(IUCN_ranges$sci_name)
+  
+  # filter taxa if provided
+  if (!is.null(taxa_filter)) {
+    taxa_spp <- taxa_spp[taxa_spp %in% taxa_filter]}
+  
+  ##########
+  # STEP 2 # Get GBIF taxon keys
+  ##########
+  
+  gbif_taxon_keys <- name_backbone_checklist(name = taxa_spp) %>%
+    filter(matchType == "EXACT") %>%
+    pull(usageKey)
+  invisible(gc())
+  
+  ##########
+  # STEP 3 # Download occurrences with coordinates only
+  ##########
+  
+  download_key <- occ_download(
+    pred_in("taxonKey", gbif_taxon_keys), 
+    pred("OCCURRENCE_STATUS","PRESENT"),
+    pred_in("basisOfRecord", c("HUMAN_OBSERVATION", "OBSERVATION", "MACHINE_OBSERVATION", "OCCURRENCE")),
+    pred("hasCoordinate", TRUE),
+    pred_notnull("decimalLatitude"),
+    pred_notnull("decimalLongitude"),
+    format = "SIMPLE_CSV",
+    user = gbif_user,
+    pwd = gbif_pwd,
+    email = gbif_email
+  )
+  
+  # wait until finished
+  message("Downloading occurrences file from GBIF. Please wait...")
+  occ_download_wait(download_key)
+  invisible(gc())
+  
+  # retrieve and import download
+  d <- occ_download_get(key = download_key)
+  gbif_data <- occ_download_import(d)
+  rm(d)
+  invisible(gc())
+  
+  ##########
+  # STEP 4 # Filter species with >30 records
+  ##########
+  
+  gbif_data_filtered <- gbif_data %>%
+    drop_na(decimalLatitude, decimalLongitude, year) %>% 
+    dplyr::filter(# keep only species (exclude subspecies for instance)
+      taxonRank == "SPECIES",
+      infraspecificEpithet == "",
+      # only keep occ with year info.
+      year > 0) %>% 
+    group_by(species) %>% 
+    # keep only species with over 30 occ
+    dplyr::filter(n() > 30) %>% 
+    ungroup()
+  
+  ##########
+  # STEP 5 # Crop occurrences within IUCN range
+  ##########
+  
+  # progress message
+  message("Cropping occurrences by species IUCN range...")
+  
+  gbif_sf <- st_as_sf(
+    gbif_data_filtered,
+    coords = c("decimalLongitude", "decimalLatitude"),
+    crs = st_crs(IUCN_ranges))
+  invisible(gc())
+  
+  sf_use_s2(FALSE)
+  occurrences_in_range <- bind_rows(lapply(taxa_spp, function(sp) {
+    message(sp)
+    poly <- IUCN_ranges %>% filter(sci_name == sp)
+    pts  <- gbif_sf %>% filter(species == sp)
+    if (nrow(poly) == 0 || nrow(pts) == 0) return(NULL)
+    st_join(pts, poly, join = st_within, left = FALSE)
+  }))
+  
+  return(occurrences_in_range)
+}
+
