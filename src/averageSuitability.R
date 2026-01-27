@@ -365,7 +365,7 @@ for (status in names(mean_status_rasters)) {
       scale_fill_distiller(
         palette = "RdYlGn",
         direction = 1,
-        limits = c(0, 1),
+        limits = c(0, 0.8),
         oob = scales::squish,
         name = "Mean suitability") +
       labs(title = paste(scenario_labels[scenario]),
@@ -376,6 +376,17 @@ for (status in names(mean_status_rasters)) {
     conservStatus_plots[[paste(status, scenario, sep = "_")]] <- p
   }
 }
+conservStatus_plots$VU_Current
+conservStatus_plots$VU_ssp126_2030
+conservStatus_plots$VU_ssp126_2050
+conservStatus_plots$VU_ssp585_2030
+conservStatus_plots$VU_ssp585_2050
+conservStatus_plots$EN_Current
+conservStatus_plots$EN_ssp126_2030
+conservStatus_plots$EN_ssp126_2050
+conservStatus_plots$EN_ssp585_2030
+conservStatus_plots$EN_ssp585_2030
+conservStatus_plots$EN_ssp585_2050
 
 ############
 # SSP1-2.6 #
