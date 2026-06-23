@@ -3,19 +3,24 @@
 ## Description: Create all suplementary material's figure from the SDM's runs ##
 ## Date: 30th Aug 2025 ##
 
+source("src/customFunctions2.R")
 
 # paths for outputs
-mammalsOutputs <- "C:/Users/maria/Desktop/mammalOutputs" #REPLACE WITH YOUR OWN PATH
-birdsOutputs <- "C:/Users/maria/Desktop/birdOutputs" # REPLACE WITH YOUR OWN PATH
-pathSMDoutputs <- c(mammalsOutputs, birdsOutputs)
+mammalsOutputs <- "E:/BankOfSpain_june2026/SDMs_mammals" #REPLACE WITH YOUR OWN PATH
+birdsOutputs <- "E:/BankOfSpain_june2026/SDMs_birds" # REPLACE WITH YOUR OWN PATH
+pathSDMoutputs <- c(mammalsOutputs, birdsOutputs)
 
-#pathSMDoutputs <- "C:/Users/maria/Desktop/birdOutputs"
-
-# new folder to save figures
-outputPathSDMfigures <- "C:/Users/maria/Desktop/SDMoutputs31Aug2025" # adapt if needed
-if (!dir.exists(outputPathSDMfigures)) {
-  dir.create(outputPathSDMfigures, recursive = TRUE)
+# folder to save figure and tables on SDM outputs
+SDMsFigures_dir <- "E:/BankOfSpain_june2026/SDM_outputfigures" # adapt if needed
+if (!dir.exists(SDMsFigures_dir)) {
+  dir.create(SDMsFigures_dir, recursive = TRUE)
 }
+# create subfolder for presence plots
+presencePlotBase <- file.path(SDMsFigures_dir, "presencePlots")
+if (!dir.exists(presencePlotBase)) {
+  dir.create(presencePlotBase, recursive = TRUE)
+}
+
 
 # scenarios names (used for files)
 scenarios <- c("Current", "ssp126_2030", "ssp126_2050",
@@ -29,17 +34,14 @@ scenario_labels <- c(
   ssp585_2030 = "SSP5-8.5 (2030)",
   ssp585_2050 = "SSP5-8.5 (2050)")
 
-targetSpecies <- c(## BIRDS ##
-                   "Streptopelia turtur", "Otis tarda", "Chlamydotis undulata",
-                   "Neophron percnopterus", "Gyps rueppellii", "Aquila adalberti",
-                   "Lanius meridionalis", "Chersophilus duponti", "Fringilla polatzeki",
-                   "Pyrrhula murina", 
-                   ## MAMMALS ##
-                   "Crocidura canariensis", "Eliomys quercinus", "Galemys pyrenaicus",
-                   "Lepus castroviejoi", "Lynx pardinus", "Myotis capaccinii",
-                   "Nyctalus lasiopterus", "Nyctalus azoreum", "Pipistrellus maderensis",
-                   "Rhinolophus mehelyi", "Oryctolagus cuniculus", "Plecotus teneriffae",
-                   "Miniopterus schreibersii")
+
+iberian_threatened_mammals <- read_csv("data/iberian_threatened_mammals_taxonomy.csv") %>% 
+  dplyr::pull(sci_name)
+
+iberian_threatened_birds <- read_csv("data/iberian_threatened_birds_taxonomy.csv") %>% 
+  dplyr::pull(sci_name)
+
+targetSpecies <- c(iberian_threatened_birds, iberian_threatened_mammals)
 
 # get basemaps objects
 extent <- "IberianPeninsula"
@@ -55,46 +57,90 @@ gc()
 # OUTPUT 1 # Presence maps
 ############
 
+# Load GBIF occurrence data (fixed file assignments)
+gbif_mammals_all <- read_csv("data/GBIF_occurrences_mammals_2026-06-07.csv",
+                             show_col_types = FALSE)
+
+gbif_birds_all <- read_csv("data/GBIF_occurrences_birds_2026-06-08.csv",
+                           show_col_types = FALSE)
+
+# Put datasets in a named list
+gbif_data <- list(mammals = gbif_mammals_all, birds = gbif_birds_all)
+
+# Standardize column names for each dataset
+gbif_data <- lapply(gbif_data, function(df) {
+  df <- df[, 2:5]
+  
+  # careful not to switch axes
+  colnames(df)[1:3] <- c("species", "Latitude", "Longitude")
+  df$species <- gsub(" ", ".", df$species)
+  
+  return(df)
+})
+
 presencePlots <- list()
 
-#species <- "Streptopelia turtur"
-
-for (path in pathSMDoutputs) {
-
-  for (species in targetSpecies) {
+for (path in pathSDMoutputs) {
+  
+  # Detect taxa from path
+  taxa <- if (grepl("mammals", path, ignore.case = TRUE)) {
+    "mammals"} else {"birds"}
+  
+  # Select matching GBIF dataset
+  gbif_all <- gbif_data[[taxa]]
+  
+  # Extract region from path (assuming folder structure contains region)
+  region <- extent
+  
+  # Create output folder
+  taxa_output_dir <- file.path(presencePlotBase, taxa)
+  if (!dir.exists(taxa_output_dir)) {
+    dir.create(taxa_output_dir, recursive = TRUE)
+  }
+  
+  for (sps in targetSpecies) {
     
-    message(paste0("Building Presence Plot for ", species))
-    # file path for the presence .csv
-    csv_file <- file.path(path,
-                          paste0("PresencePoints_", gsub(" ", ".", species), "_", extent, ".csv"))
+    message(paste0("Building Presence Plot for ", sps, " (", taxa, ")"))
     
-    if (file.exists(csv_file)) {
-      # read presence points
-      presence_df <- readr::read_csv(csv_file, show_col_types = FALSE)
-      colnames(presence_df)[1:2] <- c("Longitude", "Latitude")
-      presence_df$Type <- "Presence Points"
-      
-      # Plot occurrences over world map
-      p <- ggplot() +
-        geom_sf(data = world, fill = "grey95", color = "black") +
-        geom_point(
-          data = presence_df,
-          aes(x = Longitude, y = Latitude),
-          color = "red", size = 0.3, alpha = 0.7
-        ) +
-        ggtitle(bquote("Presence points of " * italic(.(species)) * " since 2015")) +
-        theme_minimal()
-      
-      # save all  species plots inside a list
-      presencePlots[[gsub(" ", ".", species)]] <- p
-      
-      # save plot as image
-      ggsave(plot = p,
-             file = file.path(outputPathSDMfigures, "presencePlots", paste0("PresencesPlot_", gsub(" ", ".", species), ".png")),
-             bg = 'white', width = 300, height = 150, units = "mm", dpi = 1200, 
-             #compression ="lzw"
-             )
-    }
+    # Presence points used in SDMs
+    csv_file <- file.path(path, paste0("PresencePoints_", gsub(" ", ".", sps), "_", region, ".csv"))
+    
+    if (!file.exists(csv_file)) next
+    
+    presence_df <- read_csv(csv_file, show_col_types = FALSE)
+    colnames(presence_df)[1:2] <- c("Longitude", "Latitude")
+    presence_df$Type <- "SDM Presences"
+    
+    # Total GBIF occurrence records
+    gbif_species <- gbif_all %>%
+      filter(species == gsub(" ", ".", sps)) %>%
+      mutate(Type = "GBIF Occurrences")
+    
+    # Color-blind palette
+    color_map <- c("GBIF" = "#0072B2", "SDM"  = "#E69F00")
+    
+    # Plot
+    p <- ggplot() +
+      geom_sf(data = world, fill = "grey95", color = "black") +
+      geom_point(data = gbif_species,
+                 aes(x = Longitude, y = Latitude, color = "GBIF"), size = 0.4, alpha = 0.6) +
+      geom_point(data = presence_df,
+                 aes(x = Longitude, y = Latitude, color = "SDM"), size = 0.7, alpha = 0.8) +
+      scale_color_manual(values = color_map, breaks = c("GBIF", "SDM"),
+        labels = c("GBIF occurrences", "SDM presences"),
+        drop = FALSE) +
+      theme_minimal(base_size = 12) +
+      theme(legend.title = element_blank(), 
+            legend.position = "bottom",
+            legend.background = element_rect(fill = "white", color = "grey80"),
+            panel.grid = element_line(color = "grey90"))
+    
+    invisible(gc())
+    
+    # Save plot
+    ggsave(plot = p, file = file.path(taxa_output_dir,
+                                      paste0("PresencesPlot_", gsub(" ", ".", sps), ".png")),
+      bg = "white", width = 300, height = 150, units = "mm", dpi = 1200)
   }
 }
 
@@ -105,12 +151,21 @@ for (path in pathSMDoutputs) {
 all_var_importance_em <- data.frame() # create data frame for all variable importance of EM
 
 for (path in pathSMDoutputs) {
+  
+  # infer group from folder name
+  taxon_group <- ifelse(grepl("mammal", path, ignore.case = TRUE),
+                        "mammals",
+                        ifelse(grepl("bird", path, ignore.case = TRUE),
+                               "birds",
+                               NA))
+  
   for (species in targetSpecies) {
     file_path <- file.path(path,
                            paste0("VarImportanceEM_", gsub(" ", ".", species), "_", extent, ".csv"))
     if (file.exists(file_path)) {
       var_imp <- read.csv(file_path)
       var_imp$species <- species  # Add species column if not present
+      var_imp$taxon_group <- taxon_group   # <-- ADD THIS COLUMN
       all_var_importance_em <- rbind(all_var_importance_em, var_imp)
     }
   }
@@ -122,7 +177,7 @@ var_importance_em_filtered <- all_var_importance_em %>%
 
 # Summarize mean and SD for each species and variable
 importance_summary <- var_importance_em_filtered %>%
-  group_by(species, expl.var) %>%
+  group_by(taxon_group, species, expl.var) %>%
   dplyr::summarize(
     mean_importance = mean(var.imp, na.rm = TRUE), # Calculate mean
     sd_importance = sd(var.imp, na.rm = TRUE), # Calculate standard deviation
@@ -130,50 +185,69 @@ importance_summary <- var_importance_em_filtered %>%
   pivot_longer(cols = c(mean_importance, sd_importance), names_to = "metrics", values_to = "importance") %>%
   mutate(metrics = ifelse(metrics == "mean_importance", "Mean", "SD")) %>%
   pivot_wider(names_from = expl.var, values_from = importance) %>%
-  dplyr::arrange(species, metrics)
+  dplyr::arrange(species, metrics) %>% 
+  mutate(taxon_group = case_when(taxon_group == "birds" ~ "Bird", taxon_group == "mammals" ~ "Mammal"))
 
 # write table to .csv and .xslx (for easy copy paste later)
 write.csv(importance_summary,
-          file = file.path(outputPathSDMfigures,
+          file = file.path(SDMsFigures_dir,
                            paste0("VariableImportanceSummaryTable", Sys.Date(), ".csv")), row.names = FALSE)
 writexl::write_xlsx(importance_summary,
-                    path = file.path(outputPathSDMfigures,
+                    path = file.path(SDMsFigures_dir,
                                      paste0("VariableImportanceSummaryTable", Sys.Date(), ".xlsx")))
 
 ############
 # OUTPUT 3 # Evaluation plots for Ensemble Models
 ############
 
-all_EvalScoresEM <- data.frame() 
+all_EvalScores <- data.frame() 
 
-for (path in pathSMDoutputs) {
+for (path in pathSDMoutputs) {
+  
+  taxon_group <- ifelse(grepl("mammal", path, ignore.case = TRUE), "mammals",
+                        ifelse(grepl("bird", path, ignore.case = TRUE), "birds", NA))
   
   for (species in targetSpecies) {
     
-    file_path <- file.path(path, paste0("EvalScoresEM_", gsub(" ", ".", species), "_", extent, ".csv"))
+    file_path <- file.path(path,
+                           paste0("EvalScores_", gsub(" ", ".", species), "_", extent, ".csv"))
     
     if (file.exists(file_path)) {
       eval_scores <- read.csv(file_path)
-      eval_scores$species <- species  # Add species column if not present
-      all_EvalScoresEM <- rbind(all_EvalScoresEM, eval_scores)
+      eval_scores$species <- species
+      eval_scores$taxon_group <- taxon_group
+      all_EvalScores <- rbind(all_EvalScores, eval_scores)
     }
   }
 }
-  
-eval_plot_em <- ggplot(all_EvalScoresEM, aes(x = species, y = calibration, fill = metric.eval)) +
-  geom_boxplot() +
-  labs(title = "Evaluation Metrics for Ensemble Models (EM)",
-       x = "Species",
-       y = "Calibration Score",
-       fill = "Metric") +
-  scale_fill_viridis_d(name = "Metric") +  
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 
-ggsave(plot = eval_plot_em,
-       file = file.path(outputPathSDMfigures, "EvaluationMetrics_EM_exampleSpecies.tif"),
+plots_eval <- list()
+
+for (g in unique(all_EvalScores$taxon_group)) {
+  
+  df_g <- all_EvalScores %>%
+    dplyr::filter(taxon_group == g)
+  
+  p <- ggplot(df_g, aes(x = species, y = calibration, fill = metric.eval)) +
+    geom_boxplot() +
+    labs(title = paste("Evaluation Metrics (EM) -", g),
+         x = "Species",
+         y = "Calibration Score",
+         fill = "Metric") +
+    scale_fill_viridis_d(name = "Metric") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, face = "italic"))
+  
+  plots_eval[[g]] <- p
+}
+
+ggsave(plot = plots_eval$mammals,
+       file = file.path(SDMsFigures_dir, "EvaluationMetrics_mammals.tif"),
        bg = 'white', width = 300, height = 200, units = "mm", dpi = 1200, compression ="lzw")
 
+ggsave(plot = plots_eval$birds,
+       file = file.path(SDMsFigures_dir, "EvaluationMetrics_birds.tif"),
+       bg = 'white', width = 300, height = 200, units = "mm", dpi = 1200, compression ="lzw")
 
 ############
 # OUTPUT 4 # Continuous landscapes 
@@ -197,7 +271,7 @@ for (path in pathSMDoutputs) {
       } else {
         tif_path <- file.path(
           path,
-          paste0("proj_", scenario, "_", gsub(" ", ".", species), "_continuous.tif"))
+          paste0("proj_", scenario, "_", extent, "_", gsub(" ", ".", species), "_continuous.tif"))
       }
       
       # only continue if the file exists
@@ -213,12 +287,13 @@ for (path in pathSMDoutputs) {
       
       cont_df <- as.data.frame(rast_mask, xy = TRUE, na.rm = TRUE)
       names(cont_df)[3] <- "suitability"
+      cont_df$suitability <- cont_df$suitability/1000
       
       # plot SDM results
       p <- ggplot() +
         geom_sf(data = world, fill = "grey90", color = "black", linewidth = 0.2) +
         geom_tile(data = cont_df, aes(x = x, y = y, fill = suitability)) +
-        tidyterra::scale_fill_terrain_c(name = "Suitability", limits = c(0, 1000)) +
+        tidyterra::scale_fill_terrain_c(name = "Suitability", limits = c(0, 1)) +
         coord_sf(xlim = c(iberia_bbox["xmin"], iberia_bbox["xmax"]),
                  ylim = c(iberia_bbox["ymin"], iberia_bbox["ymax"]),
                  expand = FALSE) +
@@ -267,7 +342,7 @@ for (species in targetSpecies) {
   
   # ggsave
   ggsave(plot = species_plot,
-         file = file.path(outputPathSDMfigures, "ContinuousLandscapes", paste0("SDMlandscapes_", species, ".png")),
+         file = file.path(SDMsFigures_dir, "ContinuousLandscapes", paste0("SDMlandscapes_", species, ".png")),
          bg = 'white', width = 300, height = 150, units = "mm", dpi = 1200,
          #compression ="lzw"
          )
@@ -297,7 +372,7 @@ for (path in pathSMDoutputs) {
       } else {
         tif_path <- file.path(
           path,
-          paste0("proj_", scenario, "_", gsub(" ", ".", species), "_binary.tif"))
+          paste0("proj_", scenario, "_", extent, "_", gsub(" ", ".", species), "_binary.tif"))
       }
       
       # only continue if the file exists
@@ -371,99 +446,99 @@ for (species in targetSpecies) {
   
   # ggsave
   ggsave(plot = species_binary_plot,
-         file = file.path(outputPathSDMfigures, "BinaryLandscapes", paste0("BinaryLandscapes_", species, ".png")),
+         file = file.path(SDMsFigures_dir, "BinaryLandscapes", paste0("BinaryLandscapes_", species, ".png")),
          bg = 'white', width = 300, height = 150, units = "mm", dpi = 1200,
          #compression ="lzw"
          )
 }
 
-
-############
-# OUTPUT 6 # Hotspot areas maps
-############
-
-# all files
-mammal_files <- list.files(mammalsOutputs, pattern = "_binary.tif",
-                           full.names = TRUE, recursive = TRUE)
-bird_files <- list.files(birdsOutputs, pattern = "_binary.tif",
-                         full.names = TRUE, recursive = TRUE)
-binary_files <- c(mammal_files, bird_files)
-
-
-# current scenario files
-current_files <- binary_files[grep("proj_Current_EM", binary_files)]
-
-# future scenario files
-future_ssp126 <- binary_files[grep("ssp126", binary_files)]
-future_ssp585 <- binary_files[grep("ssp585", binary_files)]
-
-
-# paths to binary rasters
-raster_paths <- list(
-  Current = current_files,
-  ssp126_2030 = future_ssp126[grepl("2030", future_ssp126)],
-  ssp126_2050 = future_ssp126[grepl("2050", future_ssp126)],
-  ssp585_2030 = future_ssp585[grepl("2030", future_ssp585)],
-  ssp585_2050 = future_ssp585[grepl("2050", future_ssp585)] 
-)
-
-# empty list to store plots
-hotspots_list <- list()
-
-# overlap all rasters per scenario and year
-for (scenario in names(raster_paths)) {
-  
-  # stack and sum binary rasters
-  r_sum <- sum(rast(raster_paths[[scenario]]))
-  
-  # crop + mask to Iberia extent (to avoid seeing norther africa in colors)
-  r_crop <- crop(r_sum, iberia_vect)   
-  r_mask <- mask(r_crop, iberia_vect)  
-  
-  # convert to dataframe
-  r_df <- as.data.frame(r_mask, xy = TRUE)
-  
-  # plot
-  p <- ggplot(r_df) +
-    geom_sf(data = world, fill = "grey90", color = "black", linewidth = 0.2) +
-    geom_tile(aes(x = x, y = y, fill = sum)) +
-    coord_sf(xlim = c(iberia_bbox["xmin"], iberia_bbox["xmax"]),
-             ylim = c(iberia_bbox["ymin"], iberia_bbox["ymax"]),
-             expand = FALSE)  +
-    scale_fill_distiller(palette = "Spectral",
-                         direction = -1,
-                         name = "Estimated no of\nthreatened species",
-                         limits = c(0, 16)) +
-    labs(x = "Longitude", y = "Latitude", title = scenario_labels[scenario]) +
-    theme_minimal() +
-    theme(legend.position = "bottom") +
-    guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
-  
-  # store plots in a list for later
-  hotspots_list[[scenario]] <- p
-}
-
-# extract plots for each scenario
-hotspots_current <- hotspots_list[["Current"]]
-hotspots_126_2030 <- hotspots_list[["ssp126_2030"]]
-hotspots_126_2050 <- hotspots_list[["ssp126_2050"]]
-hotspots_585_2030 <- hotspots_list[["ssp585_2030"]]
-hotspots_585_2050 <- hotspots_list[["ssp585_2050"]]
-
-# display plots as needed
-species_plot <- 
-  (hotspots_current | (hotspots_126_2030 / hotspots_585_2030) | (hotspots_126_2050 / hotspots_585_2050))  +
-  plot_layout(widths = c(1, 1, 1),
-              guides = "collect") &
-  theme(legend.position = "bottom") 
-
-# save final figure
-ggsave(plot = species_plot,
-       file = file.path(outputPathSDMfigures, paste0("HotspotAreasMap_", Sys.Date(), ".tif")),
-       bg = 'white', width = 300, height = 150, units = "mm", dpi = 1200, compression ="lzw")
-
-ggsave(plot = species_plot,
-       file = file.path(outputPathSDMfigures, paste0("HotspotAreasMap_", Sys.Date(), ".png")),
-       bg = 'white', width = 300, height = 150, units = "mm", dpi = 1200
-       #, compression ="lzw"
-       )
+# 
+# ############
+# # OUTPUT 6 # Hotspot areas maps
+# ############
+# 
+# # all files
+# mammal_files <- list.files(mammalsOutputs, pattern = "_binary.tif",
+#                            full.names = TRUE, recursive = TRUE)
+# bird_files <- list.files(birdsOutputs, pattern = "_binary.tif",
+#                          full.names = TRUE, recursive = TRUE)
+# binary_files <- c(mammal_files, bird_files)
+# 
+# 
+# # current scenario files
+# current_files <- binary_files[grep("proj_Current_EM", binary_files)]
+# 
+# # future scenario files
+# future_ssp126 <- binary_files[grep("ssp126", binary_files)]
+# future_ssp585 <- binary_files[grep("ssp585", binary_files)]
+# 
+# 
+# # paths to binary rasters
+# raster_paths <- list(
+#   Current = current_files,
+#   ssp126_2030 = future_ssp126[grepl("2030", future_ssp126)],
+#   ssp126_2050 = future_ssp126[grepl("2050", future_ssp126)],
+#   ssp585_2030 = future_ssp585[grepl("2030", future_ssp585)],
+#   ssp585_2050 = future_ssp585[grepl("2050", future_ssp585)] 
+# )
+# 
+# # empty list to store plots
+# hotspots_list <- list()
+# 
+# # overlap all rasters per scenario and year
+# for (scenario in names(raster_paths)) {
+#   
+#   # stack and sum binary rasters
+#   r_sum <- sum(rast(raster_paths[[scenario]]))
+#   
+#   # crop + mask to Iberia extent (to avoid seeing norther africa in colors)
+#   r_crop <- crop(r_sum, iberia_vect)   
+#   r_mask <- mask(r_crop, iberia_vect)  
+#   
+#   # convert to dataframe
+#   r_df <- as.data.frame(r_mask, xy = TRUE)
+#   
+#   # plot
+#   p <- ggplot(r_df) +
+#     geom_sf(data = world, fill = "grey90", color = "black", linewidth = 0.2) +
+#     geom_tile(aes(x = x, y = y, fill = sum)) +
+#     coord_sf(xlim = c(iberia_bbox["xmin"], iberia_bbox["xmax"]),
+#              ylim = c(iberia_bbox["ymin"], iberia_bbox["ymax"]),
+#              expand = FALSE)  +
+#     scale_fill_distiller(palette = "Spectral",
+#                          direction = -1,
+#                          name = "Estimated no of\nthreatened species",
+#                          limits = c(0, 16)) +
+#     labs(x = "Longitude", y = "Latitude", title = scenario_labels[scenario]) +
+#     theme_minimal() +
+#     theme(legend.position = "bottom") +
+#     guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
+#   
+#   # store plots in a list for later
+#   hotspots_list[[scenario]] <- p
+# }
+# 
+# # extract plots for each scenario
+# hotspots_current <- hotspots_list[["Current"]]
+# hotspots_126_2030 <- hotspots_list[["ssp126_2030"]]
+# hotspots_126_2050 <- hotspots_list[["ssp126_2050"]]
+# hotspots_585_2030 <- hotspots_list[["ssp585_2030"]]
+# hotspots_585_2050 <- hotspots_list[["ssp585_2050"]]
+# 
+# # display plots as needed
+# species_plot <- 
+#   (hotspots_current | (hotspots_126_2030 / hotspots_585_2030) | (hotspots_126_2050 / hotspots_585_2050))  +
+#   plot_layout(widths = c(1, 1, 1),
+#               guides = "collect") &
+#   theme(legend.position = "bottom") 
+# 
+# # save final figure
+# ggsave(plot = species_plot,
+#        file = file.path(outputPathSDMfigures, paste0("HotspotAreasMap_", Sys.Date(), ".tif")),
+#        bg = 'white', width = 300, height = 150, units = "mm", dpi = 1200, compression ="lzw")
+# 
+# ggsave(plot = species_plot,
+#        file = file.path(outputPathSDMfigures, paste0("HotspotAreasMap_", Sys.Date(), ".png")),
+#        bg = 'white', width = 300, height = 150, units = "mm", dpi = 1200
+#        #, compression ="lzw"
+#        )
