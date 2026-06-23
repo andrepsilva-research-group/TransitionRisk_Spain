@@ -46,7 +46,7 @@ sps_extent <- sps_extent %>%
 # build taxonomy table
 sps_names <- sps_extent %>%
   st_drop_geometry() %>%
-  select(id_no, sci_name, order_, family, genus, legend) %>%
+  select(id_no, sci_name, order_, family, genus, category) %>%
   distinct(sci_name, .keep_all = TRUE)
 
 # add species occurrences (from GBIF with rgbif pkg
@@ -123,6 +123,7 @@ target_bird_sps <- unique(birds_threatened$Scientific.name)
 
 # get taxonomic info
 taxo_info <- taxize::classification(target_bird_sps, db = "gbif")
+invisible(gc())
 taxo_df <- do.call(rbind, lapply(names(taxo_info), function(sp) {
   cl <- taxo_info[[sp]]
   if (is.null(cl)) return(NULL)
@@ -137,33 +138,44 @@ invisible(gc(rm(taxo_info)))
 
 bird_sps_names <- left_join(birds_threatened %>% rename(sci_name = Scientific.name),
                        taxo_df, by = "sci_name") %>% 
-  dplyr::select(SIS.ID, Common.name, sci_name, order_, family, genus)
+  dplyr::select(SIS.ID, sci_name, Common.name, order_, family, genus, RL.Category)%>%
+  # fix typo
+  mutate(sci_name = if_else(sci_name == "Gyps rueppelli", "Gyps rueppellii", sci_name))
 
 # add species occurrences (from GBIF with rgbif pkg
 birdSpecies <- unique(bird_sps_names$sci_name)
 
+
+birdSpecies <- unique(bird_sps_names$sci_name)
+
+# fix typo
+birdSpecies[birdSpecies == "Gyps rueppelli"] <- "Gyps rueppellii"
+
 message("Querying GBIF for ", length(birdSpecies), " species...")
 pb <- utils::txtProgressBar(min = 0, max = length(birdSpecies), style = 3)
+
 occ_total <- integer(length(birdSpecies))
 occ_2015  <- integer(length(birdSpecies))
 
 for (i in seq_along(birdSpecies)) {
   
-  # Total occurrences (with coordinates)
   occ_total[i] <- rgbif::occ_count(
     scientificName = birdSpecies[i],
     hasCoordinate  = TRUE,
     basisOfRecord = "HUMAN_OBSERVATION;OBSERVATION;OCCURRENCE;MACHINE_OBSERVATION"
   )
   
-  # Occurrences from 2015 onwards
+  Sys.sleep(1.5)   # pause between requests
+  
   occ_2015[i] <- rgbif::occ_count(
     scientificName = birdSpecies[i],
     hasCoordinate  = TRUE,
     basisOfRecord = "HUMAN_OBSERVATION;OBSERVATION;OCCURRENCE;MACHINE_OBSERVATION",
     year           = "2015,2024"
   )
-  # add progress bar as this step might take a while
+  
+  Sys.sleep(1.5)
+  
   utils::setTxtProgressBar(pb, i)
 }
 close(pb)
@@ -178,7 +190,7 @@ occ_df_birds <- data.frame(
 
 # left join with taxonomy
 bird_sps_names <- bird_sps_names %>% 
-  left_join(occ_df, by = "sci_name")
+  left_join(occ_df_birds, by = "sci_name")
 
 # write table into a csv file (taxonomy + occ number)
 write.csv(bird_sps_names,
