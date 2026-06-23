@@ -1264,3 +1264,33 @@ SDMensembleMultiSpecies <- function(targetSpecies, # vector of target species na
   #)
 }
 
+
+### Fixing species names for prettier plotting ---------------------------------
+
+# This function transforms names WITHOUT spaces into the correct form based on
+# the trait dataframe that exists in the data folder of this repo
+
+pretty_species_names <- function(x) {
+  library(here)
+  # import trait dataframe 
+  mammalTraits_2025_03_17 <- read_csv(here("data", "externaldata", "mammalTraits_2025-12-11.csv"),
+                                      show_col_types = FALSE)
+  
+  # pull the species names **WITH SPACES** column 
+  with_spaces <- unique(mammalTraits_2025_03_17$sci_name)
+  
+  # get corresponding names **WITHOUT** spaces
+  no_spaces <- gsub(" ", ".", with_spaces)
+  
+  # match and replace names
+  matched <- match(x, no_spaces)
+  
+  # show warninng if any names are not found
+  if (any(is.na(matched))) {
+    unmatched <- x[is.na(matched)]
+    warning(paste(unmatched, collapse = ", "), "was/were not matched")
+  }
+  
+  return(with_spaces[matched])
+}
+
