@@ -1,17 +1,21 @@
 ## Name: averageSuitability.R ##
-## Authors: Inês Silva
-## Description: Produces maps of average suitability per pixel to add to an overall index ##
+## Author: Inês Silva ##
+## Date: 30th June 2025 ##
+## Description: Produces maps of average suitability per pixel to add to an
+## overall index for spatial prioritization analysis. ##
 
+
+source("src/libraries.R")
 
 # paths for outputs
-mammalsOutputs <- "./output/mammalOutputs" #REPLACE WITH YOUR OWN PATH
-birdsOutputs <- "./output/birdOutputs" # REPLACE WITH YOUR OWN PATH
+mammalsOutputs <- "E:/BankOfSpain_june2026/SDMs_mammals"
+birdsOutputs <- "E:/BankOfSpain_june2026/SDMs_birds"
 pathSMDoutputs <- c(mammalsOutputs, birdsOutputs)
 
 #pathSMDoutputs <- "C:/Users/maria/Desktop/birdOutputs"
 
 # new folder to save figures
-outputPath_averageSuitbaility <- "./output/averageSuitability_19Jan2026" # adapt if needed
+outputPath_averageSuitbaility <- "./output/averageSuitability_June2026" # adapt if needed
 if (!dir.exists(outputPath_averageSuitbaility)) {
   dir.create(outputPath_averageSuitbaility, recursive = TRUE)
 }
@@ -28,127 +32,13 @@ scenario_labels <- c(
   ssp585_2030 = "SSP5-8.5 (2030)",
   ssp585_2050 = "SSP5-8.5 (2050)")
 
-# species currently with SDM outputs (19th Jan 2026)
-targetSpecies <- c(
-  ## BIRDS ##
-  "Streptopelia turtur", "Otis tarda", "Chlamydotis undulata",
-  "Neophron percnopterus", "Gyps rueppellii", "Aquila adalberti",
-  "Lanius meridionalis", "Chersophilus duponti", "Fringilla polatzeki",
-  "Pyrrhula murina", 
-  ## MAMMALS ##
-  "Crocidura canariensis", "Eliomys quercinus", "Galemys pyrenaicus",
-  "Lepus castroviejoi", "Lynx pardinus", "Myotis capaccinii",
-  "Nyctalus lasiopterus", "Nyctalus azoreum", "Pipistrellus maderensis",
-  "Rhinolophus mehelyi", "Oryctolagus cuniculus", "Plecotus teneriffae",
-  "Miniopterus schreibersii")
+library(readr)
+iberian_threatened_mammals <- read_csv("data/iberian_threatened_mammals_taxonomy.csv")
+iberian_threatened_birds <- read_csv("data/iberian_threatened_birds_taxonomy.csv") %>% 
+  rename("category" = "RL.Category")
 
-
-## --- MAMMALS --- ##
-
-# How to obtain an IUCN shapefile ----------------------------------------------
-# - Go to the IUCN Red List website: https://www.iucnredlist.org/resources/spatial-data-download
-# - Choose the target species group (e.g. "Terrestrial Mammals")
-# - Click the "Polygon download" button (you will need to create a free IUCN account)
-# - Follow the website instruction for download
-# - Once on your computer, extract the downloaded .zip file and move it into your data folder
-# ------------------------------------------------------------------------------
-
-sps_group <- "mammals"
-
-# read a IUCN shapefile
-sps <- sf::st_read("./data/MAMMALS_TERRESTRIAL_ONLY/MAMMALS_TERRESTRIAL_ONLY.shp")
-
-# filter for threatened species
-sps_threatened <- sps %>%
-  filter(category %in% c("CR", "EN", "VU"))
-invisible(gc(rm(sps)))
-
-# choose a target area
-extent_sf <- rnaturalearth::ne_countries(
-  scale = "medium",
-  country = c("Spain", "Portugal"),
-  returnclass = "sf")
-
-# intersect IUCN file with target area
-sf_use_s2(FALSE) # work on a flat earth
-sps_extent <- st_intersection(sps_threatened, extent_sf)
-invisible(gc(rm(extent_sf)))
-
-# inspect species and REMOVE or ADD species manually 
-target_sps <- unique(sps_extent$sci_name)
-target_sps <- target_sps[target_sps != "Macaca sylvanus"] # REMOVE Macaca sylvanus (non-native species)
-
-
-# save a .csv file with the taxonomic info
-sps_names <- sps_extent %>% 
-  dplyr::select(id_no, sci_name, order_, family, genus, legend, category) %>% 
-  dplyr::filter(sci_name %in% target_sps) %>% 
-  st_drop_geometry() %>% 
-  unique()
-
-## --- BIRDS --- ##
-
-# How to obtain a Bird species list from BirdLife ------------------------------
-# - Go to BirdLife International website: https://datazone.birdlife.org/search
-# - Choose the filters on the left hand side to choose the target area/criteria 
-# - Click the "Download" button 
-# - Follow the website instruction for download
-# - Once on your computer, extract the downloaded .zip file and move it into your data folder
-# ------------------------------------------------------------------------------
-
-sps_group <- "birds"
-
-# read csv species list
-sps <- read.csv("./data/BIRDLIFE_spsList/species-filter-results.csv")
-
-# filter for threatened species
-sps_threatened <- sps %>%
-  filter(RL.Category %in% c("CR", "EN", "VU"))
-invisible(gc(rm(sps)))
-
-# inspect species and REMOVE or ADD species manually
-target_sps <- unique(sps_threatened$Scientific.name)
-
-# get taxonomic info
-taxo_info <- taxize::classification(target_sps, db = "gbif")
-taxo_df <- do.call(rbind, lapply(names(taxo_info), function(sp) {
-  cl <- taxo_info[[sp]]
-  if (is.null(cl)) return(NULL)
-  data.frame(
-    sci_name = sp,
-    order_ = cl$name[cl$rank == "order"],
-    family = cl$name[cl$rank == "family"],
-    genus = cl$name[cl$rank == "genus"],
-    stringsAsFactors = FALSE)
-}))
-invisible(gc(rm(taxo_info)))
-
-sps_names_bird <- left_join(sps_threatened %>% rename(sci_name = Scientific.name),
-                       taxo_df, by = "sci_name") %>% 
-  dplyr::select(SIS.ID, sci_name, order_, family, genus, Common.name, RL.Category) %>% 
-  dplyr::filter(sci_name %in% targetSpecies)
-
-
-sps_names_std <- sps_names %>%
-  dplyr::rename(id_no = id_no,
-                sci_name = sci_name,
-                order_ = order_,
-                family = family,
-                genus = genus,
-                common_name = legend,
-                conservation_status = category)
-
-sps_names_bird_std <- sps_names_bird %>%
-  dplyr::rename(id_no = SIS.ID,
-                sci_name = sci_name,
-                order_ = order_,
-                family = family,
-                genus = genus,
-                common_name = Common.name,
-                conservation_status = RL.Category)
-
-sps_names_all <- dplyr::bind_rows(sps_names_std,sps_names_bird_std)
-
+targetSpecies <- c(iberian_threatened_mammals$sci_name, iberian_threatened_birds$sci_name)
+# 43 but we only have sdms for less
 
 # get basemaps objects
 extent <- "IberianPeninsula"
@@ -183,14 +73,14 @@ for (path in pathSMDoutputs) {
       } else {
         tif_path <- file.path(
           path,
-          paste0("proj_", scenario, "_", gsub(" ", ".", species), "_continuous.tif")
+          paste0("proj_", scenario, "_IberianPeninsula_", gsub(" ", ".", species), "_continuous.tif")
         )
       }
       
       if (!file.exists(tif_path)) next
       
       # read + spatial prep
-      r <- rast(tif_path)
+      r <- rast(tif_path) / 1000
       r <- crop(r, iberia_vect)
       r <- mask(r, iberia_vect)
       
@@ -205,6 +95,9 @@ for (path in pathSMDoutputs) {
   }
 }
 
+#plot(scenario_rasters$ssp126_2030$`Eliomys quercinus`)
+  
+  
 # average rasters
 mean_rasters <- list()
 for (scenario in names(scenario_rasters)) {
@@ -212,8 +105,15 @@ for (scenario in names(scenario_rasters)) {
   # stack rasters
   r_stack <- rast(scenario_rasters[[scenario]])
   
+  mean_raster_scenario <- mean(r_stack, na.rm = TRUE)
+  
   # pixel-wise mean
-  mean_rasters[[scenario]] <- mean(r_stack, na.rm = TRUE)
+  mean_rasters[[scenario]] <- mean_raster_scenario
+  
+  writeRaster(mean_raster_scenario,
+              paste0("output/scenarioAverages/", scenario, "_mean.tif"),
+              overwrite = TRUE)
+  
 }
 
 #mean_rasters$Current
@@ -226,7 +126,7 @@ for (scenario in names(mean_rasters)) {
   mean_df <- as.data.frame(mean_rasters[[scenario]],
                            xy = TRUE, na.rm = TRUE)
   names(mean_df)[3] <- "meanSuitability"
-  mean_df$meanSuitability <- mean_df$meanSuitability / 1000
+  mean_df$meanSuitability <- mean_df$meanSuitability
   
   p <- ggplot() +
     geom_sf(data = world, fill = "grey95", color = "black") +
@@ -265,7 +165,7 @@ species_plot <-
 
 # save plot as image
 ggsave(plot = species_plot,
-       file = "./output/AverageSuitbaility_MammalBirdSpecies_21Jan2026.png",
+       file = "./output/AverageSuitbaility_MammalBirdSpecies_June2026.png",
        bg = 'white', width = 300, height = 150, units = "mm", dpi = 1200 
        #compression ="lzw"
 )
@@ -274,14 +174,15 @@ ggsave(plot = species_plot,
 # BASED ON CONSERVATION STATUS AVERAGE SUITABILITY MAPS #
 #########################################################
 
+sps_names_all <- bind_rows(iberian_threatened_mammals, iberian_threatened_birds)
 # named vector: species -> conservation category
 sps_to_cat <- sps_names_all %>%
-  dplyr::select(sci_name, conservation_status) %>%
+  dplyr::select(sci_name, category) %>%
   distinct() %>%
   tibble::deframe()
 
 sps_names_all %>% 
-  group_by(conservation_status) %>% 
+  group_by(category) %>% 
   summarise(n = n())
 
 # empty list
@@ -306,7 +207,7 @@ for (path in pathSMDoutputs) {
         # get future scenarios rasters
         tif_path <- file.path(
           path,
-          paste0("proj_", scenario, "_", gsub(" ", ".", species), "_continuous.tif")
+          paste0("proj_", scenario, "_IberianPeninsula_", gsub(" ", ".", species), "_continuous.tif")
         )
       }
       
@@ -322,6 +223,8 @@ for (path in pathSMDoutputs) {
   }
 }
 
+status_scenario_rasters$CR$Current
+
 #plot(status_scenario_rasters$VU$Current$`Lepus castroviejoi`)
 
 mean_status_rasters <- list()
@@ -335,8 +238,14 @@ for (status in names(status_scenario_rasters)) {
     r_stack <- rast(status_scenario_rasters[[status]][[scenario]])
     
     # average across species and rescale 0–1
-    mean_status_rasters[[status]][[scenario]] <-
-      mean(r_stack, na.rm = TRUE) / 1000
+    mean_raster <- mean(r_stack, na.rm = TRUE) / 1000
+    
+    # store in list
+    mean_status_rasters[[status]][[scenario]] <- mean_raster
+    
+    writeRaster(mean_raster,
+                paste0("output/conservationStatusAverages/", status, "_", scenario, "_mean.tif"),
+                overwrite = TRUE)
   }
 }
 
