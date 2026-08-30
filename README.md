@@ -1,4 +1,4 @@
-# 🏦 bankOfSpain
+# 🏦 Nature-related transition risk: Potential exposure of economic sectors to future protected area expansion in Spain
 
 [![DOI](https://img.shields.io/badge/DOI-coming_soon-blue?logo=doi&logoColor=white)](https://doi.org/10.0000/placeholder)  [![Project Page](https://img.shields.io/badge/Project_Website-MISTRAFinBio-green?logo=leaflet&logoColor=white)](https://finbio.org/)
 
