@@ -1,6 +1,10 @@
-## Species selection for Iberian Peninsula ##
-## Inês Silva & Jorinde-M. Rieger ##
-## 06 June 2026 ##
+## Name: selectSpecies.R ##
+## Author: Inês Silva & Jorinde-M. Rieger ##
+## Date: 06 June 2026 ##
+## Description: Select species with available trait data existing in the Iberian 
+## Peninsula. This script selects both mammal (lines 19 to 101) and
+## bird species (lines 103 TO 202)
+
 
 source("./src/libraries.R")
 source("./src/customFunctions2.R")
