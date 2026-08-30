@@ -1,7 +1,7 @@
-## Bird sps Occurrence Retrieval ##
-## Inês Silva & Jorinde-M. Rieger ##
-## 07 June 2026 ##
-
+## Name: taxaOccurrence_birds.R ##
+## Author: Inês Silva & Jorinde-M. Rieger ##
+## Date: 07 June 2026 ##
+## Description: Download and filter GBIF occurrence data for multiple species ##
 
 source("./src/libraries.R")
 source("./src/customFunctions2.R")
