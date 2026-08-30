@@ -1,7 +1,8 @@
 ## Name: SDMfigures.R ##
 ## Author: Jorinde-M. Rieger & Inês Silva ##
-## Description: Create all suplementary material's figure from the SDM's runs ##
 ## Date: 30th Aug 2025 ##
+## Description: Create all suplementary materials (figures and tables) from
+## multiple SDMs ##
 
 source("src/customFunctions2.R")
 
@@ -179,8 +180,8 @@ var_importance_em_filtered <- all_var_importance_em %>%
 importance_summary <- var_importance_em_filtered %>%
   group_by(taxon_group, species, expl.var) %>%
   dplyr::summarize(
-    mean_importance = mean(var.imp, na.rm = TRUE), # Calculate mean
-    sd_importance = sd(var.imp, na.rm = TRUE), # Calculate standard deviation
+    mean_importance = round(mean(var.imp, na.rm = TRUE), 4), # Calculate mean
+    sd_importance = round(sd(var.imp, na.rm = TRUE), 4), # Calculate standard deviation
     .groups = "drop") %>%
   pivot_longer(cols = c(mean_importance, sd_importance), names_to = "metrics", values_to = "importance") %>%
   mutate(metrics = ifelse(metrics == "mean_importance", "Mean", "SD")) %>%
@@ -230,24 +231,27 @@ for (g in unique(all_EvalScores$taxon_group)) {
   
   p <- ggplot(df_g, aes(x = species, y = calibration, fill = metric.eval)) +
     geom_boxplot() +
-    labs(title = paste("Evaluation Metrics (EM) -", g),
+    labs(#title = paste("Evaluation Metrics (EM) -", g),
          x = "Species",
          y = "Calibration Score",
          fill = "Metric") +
     scale_fill_viridis_d(name = "Metric") +
     theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, face = "italic"))
+    theme(text=element_text(size=18),
+      axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, face = "italic"))
   
   plots_eval[[g]] <- p
 }
 
 ggsave(plot = plots_eval$mammals,
-       file = file.path(SDMsFigures_dir, "EvaluationMetrics_mammals.tif"),
-       bg = 'white', width = 300, height = 200, units = "mm", dpi = 1200, compression ="lzw")
+       file = file.path(SDMsFigures_dir, "EvaluationMetrics_mammals.png"),
+       bg = 'white', width = 300, height = 200, units = "mm", dpi = 1200#, compression ="lzw"
+       )
 
 ggsave(plot = plots_eval$birds,
-       file = file.path(SDMsFigures_dir, "EvaluationMetrics_birds.tif"),
-       bg = 'white', width = 300, height = 200, units = "mm", dpi = 1200, compression ="lzw")
+       file = file.path(SDMsFigures_dir, "EvaluationMetrics_birds.png"),
+       bg = 'white', width = 300, height = 200, units = "mm", dpi = 1200#, compression ="lzw"
+       )
 
 ############
 # OUTPUT 4 # Continuous landscapes 
