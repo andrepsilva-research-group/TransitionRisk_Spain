@@ -1,7 +1,10 @@
 ## Name: SDM.R ##
 ## Author: Inês Silva & Jorinde-M. Rieger & André P. Silva ##
-## Description: run sdms for multiple species and multiple environmental scenarios ##
 ## Date: UPDATED 21th June 2026 ---- August 23th 2025 ##
+## Description: builds and projects ensemble Species Distribution Models (SDMs)
+## for multiple target species under current and future climate scenarios, using BIOMOD2
+
+
 
 ## Script overview:
 ##   STEP 1 – Load and crop environmental rasters to target biome.
