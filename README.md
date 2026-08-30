@@ -14,7 +14,7 @@ This repository contains all scripts and supporting materials used in the modeli
 | Folder | Description |
 |:-------------|:---------------------------------------------------------|
 | **data** | Raw data, including trait dataset for 13 mammal species, sourced from multiple databases. |
-| **src** | All R scripts used in data analysis, modeling, and visualization. |
+| **src** | All R scripts used in data analysis, modeling, and visualization.<br>➡️ For full details, see the [`src/README.md`](https://github.com/andrepsilvadev/bankOfSpain/blob/acefa2c2b18f6709fb9a3cff9199680cacd8ce87/src/README.md).<br> |
 
 <br>
 
