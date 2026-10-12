@@ -1,2 +1,0 @@
-Sector,excluded_codes,frac_threshold,total_area_km2,area_baseline_km2,area_ssp1_km2,area_ssp2_km2,area_ssp5_km2,pct_baseline,pct_ssp1,pct_ssp2,pct_ssp5,total_n_parcels,n_parcels_baseline,n_parcels_ssp1,n_parcels_ssp2,n_parcels_ssp5,pct_n_baseline,pct_n_ssp1,pct_n_ssp2,pct_n_ssp5
-Agriculture & Forestry (EuroCrops 2023),none,0.05,221732.9,49634.8,86762.1,51774.4,31076,22.4,39.1,23.3,14,12318725,1640539,3960000,1865399,835090,13.3,32.1,15.1,6.8
